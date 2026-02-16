@@ -331,38 +331,6 @@ def _convert_v1_ti_task(ti_task, project_lookup, default_project):
     data['status'] = 'completed' if ti_task.get('checked') else 'pending'
     return data
 
-    # Sync Todoist->Taskwarrior
-    tasks = todoist.items.all()
-    log.important(f'Starting sync of {len(tasks)} tasks from Todoist...')
-    for idx, ti_task in enumerate(tasks):
-        c_ti_task = _convert_ti_task(ti_task, ti_project_list)
-
-        desc = c_ti_task['description']
-        project = c_ti_task['project']
-
-        if (c_ti_task['project'] not in config_ps or
-                not config_ps[c_ti_task['project']]):
-            log.warn(f'Ignoring Task {desc} ({project})')
-            continue
-
-        # Log message
-        log.important(f'Sync Task {desc} ({project})')
-
-        # Sync Todoist with Taskwarrior task
-        _, tw_task = taskwarrior.get_task(todoist_id=ti_task['id'])
-        if bool(tw_task):
-            if 'project' not in tw_task:
-                tw_task['project'] = default_project
-            _sync_task(tw_task, c_ti_task, ti_project_list)
-            continue
-
-        # Add Taskwarrior task
-        _tw_add_task(c_ti_task)
-
-    with log.with_feedback('Syncing tasks with todoist'):
-        todoist.commit()
-        todoist.sync()
-
 
 def _convert_ti_task(ti_task, ti_project_list):
     data = {}

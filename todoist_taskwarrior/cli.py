@@ -4,6 +4,7 @@ import sys
 import datetime
 import dateutil.parser
 import io
+import requests
 
 import yaml
 from taskw import TaskWarrior
@@ -31,24 +32,47 @@ def cli():
     is_help_cmd = '-h' in sys.argv or '--help' in sys.argv
     rcfile = os.path.expanduser(TITWSYNCRC)
 
+    # Keep defaults resilient so commands can run with only an env API key.
+    config = {
+        'todoist': {
+            'project_map': {},
+            'tag_map': {},
+        },
+        'taskwarrior': {
+            'project_sync': {},
+        },
+    }
+
     if os.path.exists(rcfile):
         with open(rcfile, 'r') as stream:
-            config = yaml.safe_load(stream)
+            loaded = yaml.safe_load(stream) or {}
+            config['todoist'].update(loaded.get('todoist', {}))
+            config['taskwarrior'].update(loaded.get('taskwarrior', {}))
 
-        if 'todoist' not in config or 'api_key' not in config['todoist'] \
-                and not is_help_cmd:
-            log.error('Run configure first. Exiting.')
-            exit(1)
+    cfg_key = config['todoist'].get('api_key')
+    if cfg_key in (None, '', 'REDACTED'):
+        cfg_key = None
 
+    api_key = os.getenv('TODOIST_API_KEY') or cfg_key
+    if api_key:
+        config['todoist']['api_key'] = api_key
+    elif not is_help_cmd:
+        log.error('Run configure first or set TODOIST_API_KEY. Exiting.')
+        exit(1)
+
+    # Old sync path keeps using legacy client instance; initialize only when needed.
+    legacy_commands = {'sync', 'synchronize', 'clean'}
+    should_init_legacy = any(arg in legacy_commands for arg in sys.argv[1:])
+    if should_init_legacy:
         todoist = TodoistAPI(config['todoist']['api_key'], cache=TODOIST_CACHE)
 
-        # Create the TaskWarrior client, overriding config to
-        # create a `todoist_id` field which we'll use to
-        # prevent duplicates
-        taskwarrior = TaskWarrior(config_overrides={
-            'uda.todoist_id.type': 'string',
-            'uda.todoist_sync.type': 'date',
-        })
+    # Create the TaskWarrior client, overriding config to
+    # create a `todoist_id` field which we'll use to
+    # prevent duplicates
+    taskwarrior = TaskWarrior(config_overrides={
+        'uda.todoist_id.type': 'string',
+        'uda.todoist_sync.type': 'date',
+    })
 
 
 @cli.command()
@@ -181,6 +205,131 @@ def sync(ctx):
     with log.with_feedback('Syncing tasks with todoist'):
         todoist.commit()
         todoist.sync()
+
+
+@cli.command('import-v1')
+@click.option('--dry-run/--apply', default=True,
+              help='Preview changes by default. Use --apply to write to Taskwarrior.')
+@click.option('--include-completed', is_flag=True, default=False,
+              help='Also import completed tasks from /api/v1/tasks/completed.')
+def import_v1(dry_run, include_completed):
+    """One-way import from Todoist API v1 into Taskwarrior.
+
+    This command never writes to Todoist. It upserts Taskwarrior tasks by
+    `todoist_id`, which keeps repeated runs idempotent.
+    """
+    api_key = config['todoist']['api_key']
+    headers = {'Authorization': f'Bearer {api_key}'}
+
+    projects = _todoist_v1_get_all('/api/v1/projects', headers)
+    project_lookup = _build_v1_project_lookup(projects)
+
+    tasks = _todoist_v1_get_all('/api/v1/tasks', headers)
+    if include_completed:
+        tasks.extend(_todoist_v1_get_all('/api/v1/tasks/completed', headers))
+
+    config_ps = config.get('taskwarrior', {}).get('project_sync', {})
+    default_project = utils.try_map(config['todoist'].get('project_map', {}), 'Inbox')
+
+    created = 0
+    updated = 0
+    skipped = 0
+    errors_count = 0
+
+    log.important(f'Importing {len(tasks)} task(s) from Todoist API v1...')
+    for ti_task in tasks:
+        try:
+            c_ti_task = _convert_v1_ti_task(ti_task, project_lookup, default_project)
+            desc = c_ti_task['description']
+            project = c_ti_task['project']
+
+            if config_ps and (project not in config_ps or not config_ps[project]):
+                log.warn(f'Ignoring Task {desc} ({project})')
+                skipped += 1
+                continue
+
+            _, tw_task = taskwarrior.get_task(todoist_id=c_ti_task['tid'])
+            if bool(tw_task):
+                if dry_run:
+                    updated += 1
+                    continue
+
+                if 'project' not in tw_task:
+                    tw_task['project'] = default_project
+                _tw_update_task(tw_task, c_ti_task)
+                updated += 1
+                continue
+
+            if dry_run:
+                created += 1
+                continue
+
+            _tw_add_task(c_ti_task)
+            created += 1
+        except Exception as e:
+            errors_count += 1
+            log.error(f"Failed importing task id={ti_task.get('id')}: {e}")
+
+    click.echo(
+        f"Summary dry_run={dry_run} projects={len(projects)} tasks={len(tasks)} "
+        f"created={created} updated={updated} skipped={skipped} errors={errors_count}"
+    )
+
+
+def _todoist_v1_get_all(path, headers):
+    base_url = 'https://api.todoist.com'
+    url = f'{base_url}{path}'
+    params = {'limit': 200}
+    out = []
+    while True:
+        response = requests.get(url, headers=headers, params=params, timeout=30)
+        response.raise_for_status()
+        payload = response.json()
+        out.extend(payload.get('results', []))
+        cursor = payload.get('next_cursor')
+        if not cursor:
+            break
+        params = {'limit': 200, 'cursor': cursor}
+    return out
+
+
+def _build_v1_project_lookup(projects):
+    by_id = {p['id']: p for p in projects}
+    result = {}
+    for p in projects:
+        chain = [p]
+        parent_id = p.get('parent_id')
+        while parent_id and parent_id in by_id:
+            parent = by_id[parent_id]
+            chain.insert(0, parent)
+            parent_id = parent.get('parent_id')
+
+        project_name = '.'.join(node['name'] for node in chain)
+        project_name = utils.try_map(config['todoist'].get('project_map', {}), project_name)
+        result[p['id']] = utils.maybe_quote_ws(project_name)
+    return result
+
+
+def _convert_v1_ti_task(ti_task, project_lookup, default_project):
+    data = {}
+    data['tid'] = ti_task['id']
+    data['description'] = ti_task.get('content', '')
+    data['project'] = project_lookup.get(ti_task.get('project_id')) or default_project
+    data['priority'] = utils.ti_priority_to_tw(ti_task.get('priority', 1))
+
+    labels = ti_task.get('labels') or []
+    data['tags'] = [utils.try_map(config['todoist'].get('tag_map', {}), label)
+                    for label in labels]
+
+    data['entry'] = utils.parse_date(ti_task.get('added_at'))
+    data['due'] = utils.parse_due(ti_task.get('due'))
+    try:
+        data['recur'] = utils.parse_recur(ti_task.get('due'))
+    except errors.UnsupportedRecurrence:
+        data['recur'] = None
+
+    data['status'] = 'completed' if ti_task.get('checked') else 'pending'
+    return data
 
     # Sync Todoist->Taskwarrior
     tasks = todoist.items.all()
@@ -323,7 +472,9 @@ def _tw_update_task(tw_task, ti_task):
             tw_task['recur'] = ti_task['recur']
             changed = True
 
-        if tw_task['status'] != ti_task['status']:
+        # Recurring templates are represented as status=recurring in
+        # Taskwarrior and should not be coerced to pending/completed.
+        if tw_task['status'] != 'recurring' and tw_task['status'] != ti_task['status']:
             tw_task['status'] = ti_task['status']
             changed = True
 

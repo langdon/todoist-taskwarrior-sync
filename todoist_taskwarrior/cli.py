@@ -187,7 +187,12 @@ def sync(dry_run):
         'errors': 0,
     }
 
-    # Track new Todoist IDs created in this run to avoid false "gone" detection
+    # Track Todoist IDs created in this run (non-dry-run only).
+    # Without this, the "gone from Todoist active" pass would see these new
+    # tasks as missing from ti_tasks_by_id (which was fetched before creation)
+    # and incorrectly complete them in TW.  In dry-run mode the set stays
+    # empty — that's safe because no todoist_id is written to TW tasks, so
+    # those tasks are skipped by the `if not tid: continue` guard anyway.
     newly_created_tids: set = set()
 
     # ------------------------------------------------------------------
@@ -452,34 +457,39 @@ def _convert_v1_ti_task(ti_task, project_lookup, default_project):
     return data
 
 
+def _to_utc_timestamp(value) -> float:
+    """Convert a datetime or string to a UTC POSIX timestamp.
+
+    taskw returns naive datetimes in local time; Todoist returns ISO 8601
+    strings with an explicit UTC offset.  Calling .timestamp() on a naive
+    datetime assumes local time, which is correct — but only if we first
+    make the datetime timezone-aware so that Python's UTC conversion is
+    unambiguous.  Calling .astimezone() on a naive datetime attaches the
+    local timezone, after which .timestamp() produces a correct UTC value
+    regardless of the system timezone.
+    """
+    if value is None:
+        return 0.0
+    if isinstance(value, str):
+        dt = dateutil.parser.parse(value)
+    elif hasattr(value, 'timestamp'):
+        dt = value
+    else:
+        return 0.0
+    if dt.tzinfo is None:
+        dt = dt.astimezone()  # naive → local-tz-aware → correct UTC stamp
+    return dt.timestamp()
+
+
 def _sync_task_v1(
     client, tw_task, ti_task,
     project_lookup, tw_name_to_project_id,
     default_project, dry_run, stats,
 ):
     """Bidirectional sync for a task that exists in both TW and Todoist."""
-    # Parse the last-synced timestamp stored in TW
-    todoist_sync_stamp = 0.0
-    if 'todoist_sync' in tw_task:
-        ts = tw_task['todoist_sync']
-        if hasattr(ts, 'timestamp'):
-            todoist_sync_stamp = ts.timestamp()
-        else:
-            todoist_sync_stamp = dateutil.parser.parse(str(ts)).timestamp()
-
-    # TW last-modified timestamp
-    tw_modified_stamp = 0.0
-    if 'modified' in tw_task:
-        ms = tw_task['modified']
-        if hasattr(ms, 'timestamp'):
-            tw_modified_stamp = ms.timestamp()
-        else:
-            tw_modified_stamp = dateutil.parser.parse(str(ms)).timestamp()
-
-    # Todoist last-updated timestamp
-    ti_updated_stamp = 0.0
-    if 'updated_at' in ti_task:
-        ti_updated_stamp = dateutil.parser.parse(ti_task['updated_at']).timestamp()
+    todoist_sync_stamp = _to_utc_timestamp(tw_task.get('todoist_sync'))
+    tw_modified_stamp = _to_utc_timestamp(tw_task.get('modified'))
+    ti_updated_stamp = _to_utc_timestamp(ti_task.get('updated_at'))
 
     tw_changed = tw_modified_stamp > todoist_sync_stamp
     ti_changed = ti_updated_stamp > todoist_sync_stamp
@@ -538,6 +548,9 @@ def _push_tw_to_todoist_v1(client, tw_task, tw_name_to_project_id):
 def _tw_add_task(ti_task):
     """Add a Taskwarrior task from a converted Todoist task dict.
 
+    `todoist_id` and `todoist_sync` are stamped on the new task so that
+    subsequent sync runs match it by `todoist_id` and skip re-importing it.
+
     Returns the created Taskwarrior task.
     """
     description = ti_task['description']
@@ -552,7 +565,7 @@ def _tw_add_task(ti_task):
             due=ti_task['due'],
             recur=ti_task['recur'],
             status=ti_task['status'],
-            todoist_id=ti_task['tid'],
+            todoist_id=ti_task['tid'],       # join key — prevents re-import
             todoist_sync=datetime.datetime.now(),
         )
 

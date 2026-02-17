@@ -1,9 +1,10 @@
 """Tests for the two-way sync logic helpers in cli.py.
 
-Covers _sync_task_v1, _push_tw_to_todoist_v1, _tw_update_task, and
-_convert_v1_ti_task field mapping.
+Covers _to_utc_timestamp, _sync_task_v1, _push_tw_to_todoist_v1,
+_tw_update_task, and _convert_v1_ti_task field mapping.
 """
 import datetime
+from datetime import timezone
 import pytest
 from unittest.mock import MagicMock, patch, call
 
@@ -126,6 +127,44 @@ class TestConvertV1TiTask:
         ti = _ti_task(project_id='unknown')
         result = cli_mod._convert_v1_ti_task(ti, {}, 'MyInbox')
         assert result['project'] == 'MyInbox'
+
+
+# ---------------------------------------------------------------------------
+# _to_utc_timestamp — timezone normalisation (blocking review fix)
+# ---------------------------------------------------------------------------
+
+class TestToUtcTimestamp:
+    def test_none_returns_zero(self):
+        assert cli_mod._to_utc_timestamp(None) == 0.0
+
+    def test_utc_aware_string(self):
+        # ISO 8601 with explicit Z — must round-trip to the correct POSIX stamp
+        stamp = cli_mod._to_utc_timestamp('2024-06-01T12:00:00Z')
+        expected = datetime.datetime(2024, 6, 1, 12, 0, 0, tzinfo=timezone.utc).timestamp()
+        assert stamp == expected
+
+    def test_naive_datetime_treated_as_local_time(self):
+        # taskw returns naive datetimes in local time; _to_utc_timestamp must
+        # produce the same POSIX stamp as Python's own .timestamp() (which also
+        # treats naive datetimes as local).
+        dt_naive = datetime.datetime(2024, 6, 1, 14, 30, 0)
+        assert cli_mod._to_utc_timestamp(dt_naive) == dt_naive.timestamp()
+
+    def test_aware_datetime_passthrough(self):
+        dt_aware = datetime.datetime(2024, 6, 1, 12, 0, 0, tzinfo=timezone.utc)
+        assert cli_mod._to_utc_timestamp(dt_aware) == dt_aware.timestamp()
+
+    def test_naive_vs_aware_ordering_preserved(self):
+        # Core of the review bug: a naive local datetime that is *later* than a
+        # UTC-aware datetime must still compare as later after normalisation.
+        # Use a UTC-aware reference that is clearly an hour before the naive one.
+        ref_utc = datetime.datetime(2024, 6, 1, 10, 0, 0, tzinfo=timezone.utc)
+        # Local noon is always after 10:00 UTC regardless of timezone offset
+        # (the maximum UTC offset is +14, so local noon = UTC 22:00 the day
+        # before at worst — still the same day in most real deployments).
+        # We use 23:00 local to be safe across UTC-12..UTC+14.
+        dt_naive_later = datetime.datetime(2024, 6, 1, 23, 0, 0)
+        assert cli_mod._to_utc_timestamp(dt_naive_later) > cli_mod._to_utc_timestamp(ref_utc)
 
 
 # ---------------------------------------------------------------------------

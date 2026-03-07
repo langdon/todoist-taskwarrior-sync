@@ -1,38 +1,55 @@
-# Taskwarrior Todoist Migration Runbook (One-way)
+# todoist-taskwarrior-sync Runbook
+
+Repo: `~/cloud-sync/resources/todoist-taskwarrior-sync`
 
 ## Install
+
 ```bash
-cd ~/loc-areas/meta/tasks/taskwarrior-todoist-sync/todoist-taskwarrior-sync
-python3 -m venv .venv
-. .venv/bin/activate
-PIP_CACHE_DIR=$PWD/.pip-cache pip install -e .
+cd ~/cloud-sync/resources/todoist-taskwarrior-sync
+poetry install
 ```
 
 ## Env var setup
+
 ```bash
 export TODOIST_API_KEY='<your-token>'
 ```
 
-## Dry-run (no Taskwarrior writes)
+## Two-way sync (dry-run first)
+
 ```bash
-cd ~/loc-areas/meta/tasks/taskwarrior-todoist-sync/todoist-taskwarrior-sync
-. .venv/bin/activate
-titwsync import-v1 --dry-run
+titwsync sync --dry-run   # preview — no writes to either side
+titwsync sync --apply     # write changes to Taskwarrior and Todoist
 ```
 
-## Apply (one-way Todoist -> Taskwarrior)
+## One-way import (Todoist → Taskwarrior only)
+
 ```bash
+titwsync import-v1 --dry-run
 titwsync import-v1 --apply
 ```
 
-## Rollback
+`import-v1` never writes to Todoist. Useful if you only want to pull tasks in.
+
+## Tests
+
 ```bash
-# Restore backups created during cutover
+python -m pytest tests/
+```
+
+## Rollback
+
+If a sync run corrupts Taskwarrior state, restore from backup:
+
+```bash
 rm -rf ~/.task
 mv ~/.task.backup-<timestamp> ~/.task
 cp ~/.taskrc.backup-<timestamp> ~/.taskrc
 ```
 
-Notes:
-- This runbook intentionally does not use bidirectional sync.
-- `titwsync import-v1` does not write to Todoist.
+## Notes
+
+- Default behavior for all commands is dry-run. Writes require `--apply`.
+- Conflict resolution uses UTC-normalized timestamps (`_to_utc_timestamp`). Whichever side has a more recent `modified`/`updated_at` wins.
+- `todoist_id` UDA is the join key; `todoist_sync` UDA tracks last sync timestamp.
+- Initial one-way migration artifacts have been discarded — the migration is complete.

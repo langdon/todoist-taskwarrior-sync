@@ -1,3 +1,5 @@
 #!/usr/bin/env bash
 set -Eeuo pipefail
-ind -- poetry run titwsync "${@}"
+REPO_DIR="$(dirname "$(readlink -f "$0")")"
+cd "$REPO_DIR"
+exec poetry run titwsync "${@}"

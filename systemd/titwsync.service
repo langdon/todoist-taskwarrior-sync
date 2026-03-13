@@ -1,0 +1,14 @@
+[Unit]
+Description=Todoist <-> Taskwarrior two-way sync
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=oneshot
+EnvironmentFile=%h/.config/titwsync/env
+ExecStart=/home/lwhite/bin/titwsync sync --apply
+StandardOutput=journal
+StandardError=journal
+
+[Install]
+WantedBy=default.target

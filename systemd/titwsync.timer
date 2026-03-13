@@ -1,0 +1,10 @@
+[Unit]
+Description=Run Todoist <-> Taskwarrior sync every 2 hours
+
+[Timer]
+OnCalendar=*-*-* 00/2:00:00 America/New_York
+Persistent=true
+Unit=titwsync.service
+
+[Install]
+WantedBy=timers.target

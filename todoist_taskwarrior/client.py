@@ -47,18 +47,6 @@ class TodoistV1Client:
             return {}
         return response.json()
 
-    def _patch(self, path: str, body: dict) -> dict:
-        response = requests.patch(
-            f'{BASE_URL}{path}',
-            headers=self._headers,
-            json=body,
-            timeout=30,
-        )
-        response.raise_for_status()
-        if response.status_code == 204 or not response.content:
-            return {}
-        return response.json()
-
     # ------------------------------------------------------------------
     # Tasks
     # ------------------------------------------------------------------
@@ -93,7 +81,7 @@ class TodoistV1Client:
 
     def update_task(self, task_id: str, **fields) -> dict:
         """Partial update of a task. Pass only fields that should change."""
-        return self._patch(f'/api/v1/tasks/{task_id}', fields)
+        return self._post(f'/api/v1/tasks/{task_id}', fields)
 
     def move_task(self, task_id: str, project_id: str) -> dict:
         """Move a task to a different project."""

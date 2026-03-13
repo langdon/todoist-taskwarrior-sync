@@ -117,20 +117,20 @@ class TestCreateTask:
 
 
 class TestUpdateTask:
-    def test_patch_request(self):
+    def test_post_request(self):
         updated = {'id': '5', 'content': 'New content'}
-        with patch('requests.patch', return_value=_mock_response(updated)) as mock_patch:
+        with patch('requests.post', return_value=_mock_response(updated)) as mock_post:
             client = TodoistV1Client(API_KEY)
             result = client.update_task('5', content='New content', priority=2)
 
         assert result['content'] == 'New content'
-        _, kwargs = mock_patch.call_args
+        _, kwargs = mock_post.call_args
         assert kwargs['json'] == {'content': 'New content', 'priority': 2}
 
     def test_url_contains_task_id(self):
-        with patch('requests.patch', return_value=_mock_response({})) as mock_patch:
+        with patch('requests.post', return_value=_mock_response({})) as mock_post:
             TodoistV1Client(API_KEY).update_task('task_99', content='x')
-        args, _ = mock_patch.call_args
+        args, _ = mock_post.call_args
         assert 'task_99' in args[0]
 
 

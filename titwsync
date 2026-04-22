@@ -2,4 +2,4 @@
 set -Eeuo pipefail
 REPO_DIR="$(dirname "$(readlink -f "$0")")"
 cd "$REPO_DIR"
-exec poetry run titwsync "${@}"
+exec ./.venv/bin/titwsync "$@"  

@@ -62,9 +62,9 @@ build-force:
 
 _run-engine:
 	@$(ENGINE) run --rm $(PODMAN_FLAGS) \
-		-v $(TASKRC):/root/.taskrc:ro$(VOLUME_OPTS) \
+		-v $(TASKRC):/root/.taskrc:rw$(VOLUME_OPTS) \
 		-v $(TASK_DATA):/root/.task:rw$(VOLUME_OPTS) \
-		-v $(TITWSYNC_CFG):/root/.config/titwsync/titwsyncrc.yaml:ro$(VOLUME_OPTS) \
+		-v $(TITWSYNC_CFG):/root/.config/titwsync/titwsyncrc.yaml:rw$(VOLUME_OPTS) \
 		-e TODOIST_API_KEY="$(TODOIST_API_KEY)" \
 		-e TASKDATA=/root/.task \
 		-e HOME=/root \
@@ -74,14 +74,14 @@ run: _check-api-key
 	@$(MAKE) --no-print-directory _run-engine CMD="$(if $(RUN_ARGS),$(RUN_ARGS),$(ARGS))"
 
 run-configure: _check-api-key
-	@$(MAKE) --no-print-directory _run-engine CMD="configure $(TODOIST_API_KEY)"
+	@$(MAKE) --no-print-directory _run-engine CMD="configure $(TODOIST_API_KEY) $(if $(RUN_ARGS),$(RUN_ARGS),$(ARGS))"
 
 shell: _check-api-key
 	@$(ENGINE) run --rm -it \
 		--entrypoint /bin/bash \
-		-v $(TASKRC):/root/.taskrc:ro$(VOLUME_OPTS) \
+		-v $(TASKRC):/root/.taskrc:rw$(VOLUME_OPTS) \
 		-v $(TASK_DATA):/root/.task:rw$(VOLUME_OPTS) \
-		-v $(TITWSYNC_CFG):/root/.config/titwsync/titwsyncrc.yaml:ro$(VOLUME_OPTS) \
+		-v $(TITWSYNC_CFG):/root/.config/titwsync/titwsyncrc.yaml:rw$(VOLUME_OPTS) \
 		-e TODOIST_API_KEY="$(TODOIST_API_KEY)" \
 		-e TASKDATA=/root/.task \
 		-e HOME=/root \

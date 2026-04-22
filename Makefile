@@ -47,6 +47,8 @@ run: _check-api-key
 		-v $(TASKRC):/root/.taskrc:ro$(VOLUME_OPTS) \
 		-v $(TASK_DATA):/root/.task:rw$(VOLUME_OPTS) \
 		-e TODOIST_API_KEY="$(TODOIST_API_KEY)" \
+		-e TASKDATA=/root/.task \
+		-e HOME=/root \
 		$(IMAGE_NAME) $(ARGS)
 
 sync-dry: ARGS=sync

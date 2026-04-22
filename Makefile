@@ -17,32 +17,32 @@ else
   VOLUME_OPTS :=
 endif
 
-.PHONY: help podman-build podman-build-force podman-run sync-dry sync _check-api-key
+.PHONY: help build build-force run sync-dry sync _check-api-key
 
 help:
 	@echo "Container engine: $(ENGINE)"
 	@echo ""
-	@echo "make podman-build        - Build the container image"
-	@echo "make podman-build-force  - Rebuild without cache"
-	@echo "make podman-run          - Run with custom ARGS (default: --help)"
-	@echo "make sync-dry            - Two-way sync dry run"
-	@echo "make sync                - Two-way sync (writes to both sides)"
+	@echo "make build        - Build the container image"
+	@echo "make build-force  - Rebuild without cache"
+	@echo "make run          - Run with custom ARGS (default: --help)"
+	@echo "make sync-dry     - Two-way sync dry run"
+	@echo "make sync         - Two-way sync (writes to both sides)"
 	@echo ""
 	@echo "Required env:"
-	@echo "  TODOIST_API_KEY        - Set in environment before running"
+	@echo "  TODOIST_API_KEY - Set in environment before running"
 	@echo ""
 	@echo "Optional vars:"
 	@echo "  TASKRC=$(TASKRC)"
 	@echo "  TASK_DATA=$(TASK_DATA)"
 	@echo "  ARGS='sync --apply'"
 
-podman-build:
+build:
 	@$(ENGINE) build -t $(IMAGE_NAME) --file=$(CONTAINER_FNAME) .
 
-podman-build-force:
+build-force:
 	@$(ENGINE) build -t $(IMAGE_NAME) --file=$(CONTAINER_FNAME) --no-cache .
 
-podman-run: _check-api-key
+run: _check-api-key
 	@$(ENGINE) run --rm $(PODMAN_FLAGS) \
 		-v $(TASKRC):/root/.taskrc:ro$(VOLUME_OPTS) \
 		-v $(TASK_DATA):/root/.task:rw$(VOLUME_OPTS) \
@@ -50,10 +50,10 @@ podman-run: _check-api-key
 		$(IMAGE_NAME) $(ARGS)
 
 sync-dry: ARGS=sync --dry-run
-sync-dry: podman-run
+sync-dry: run
 
 sync: ARGS=sync --apply
-sync: podman-run
+sync: run
 
 _check-api-key:
 	@if [ -z "$(TODOIST_API_KEY)" ]; then \

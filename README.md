@@ -11,9 +11,9 @@ originally from [matt-snider/todoist-taskwarrior](https://github.com/matt-snider
 Avoids Python version breakage across OS upgrades.
 
 ```bash
-make podman-build
-make sync-dry    # preview, no writes
-make sync        # apply changes to both sides
+make build
+make sync-dry     # preview, no writes
+make sync         # apply changes to both sides
 ```
 
 `TODOIST_API_KEY` must be set in your environment. The container mounts
@@ -22,7 +22,7 @@ make sync        # apply changes to both sides
 For custom invocations:
 
 ```bash
-make podman-run ARGS="import-v1 --dry-run"
+make run ARGS="import-v1 --dry-run"
 ```
 
 ## Running (local venv)

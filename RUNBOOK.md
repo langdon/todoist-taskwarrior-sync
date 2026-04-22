@@ -3,7 +3,7 @@
 ## Running (container)
 
 ```bash
-make podman-build          # first time, or after Containerfile changes
+make build                 # first time, or after Containerfile changes
 make sync-dry              # preview — no writes to either side
 make sync                  # write changes to Taskwarrior and Todoist
 ```

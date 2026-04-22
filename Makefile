@@ -1,13 +1,27 @@
-IMAGE_NAME   ?= titwsync
+IMAGE_NAME      ?= titwsync
 CONTAINER_FNAME ?= Containerfile
-TASKRC       ?= $(HOME)/.taskrc
-TASK_DATA    ?= $(HOME)/.task
-ARGS         ?= --help
-PODMAN_FLAGS ?= -it
+TASKRC          ?= $(HOME)/.taskrc
+TASK_DATA       ?= $(HOME)/.task
+ARGS            ?= --help
+PODMAN_FLAGS    ?= -it
 
-.PHONY: help podman-build podman-build-force podman-run sync sync-dry
+# Detect container engine.
+# Prefer podman (real binary, not an alias) so we can apply SELinux volume
+# labels (:Z). Fall back to docker, which does not use them.
+_PODMAN := $(shell command -v podman 2>/dev/null)
+ifneq ($(_PODMAN),)
+  ENGINE      := podman
+  VOLUME_OPTS := :Z
+else
+  ENGINE      := docker
+  VOLUME_OPTS :=
+endif
+
+.PHONY: help podman-build podman-build-force podman-run sync-dry sync _check-api-key
 
 help:
+	@echo "Container engine: $(ENGINE)"
+	@echo ""
 	@echo "make podman-build        - Build the container image"
 	@echo "make podman-build-force  - Rebuild without cache"
 	@echo "make podman-run          - Run with custom ARGS (default: --help)"
@@ -23,15 +37,15 @@ help:
 	@echo "  ARGS='sync --apply'"
 
 podman-build:
-	@podman build -t $(IMAGE_NAME) --file=$(CONTAINER_FNAME) .
+	@$(ENGINE) build -t $(IMAGE_NAME) --file=$(CONTAINER_FNAME) .
 
 podman-build-force:
-	@podman build -t $(IMAGE_NAME) --file=$(CONTAINER_FNAME) --no-cache .
+	@$(ENGINE) build -t $(IMAGE_NAME) --file=$(CONTAINER_FNAME) --no-cache .
 
 podman-run: _check-api-key
-	@podman run --rm $(PODMAN_FLAGS) \
-		-v $(TASKRC):/root/.taskrc:ro,Z \
-		-v $(TASK_DATA):/root/.task:rw,Z \
+	@$(ENGINE) run --rm $(PODMAN_FLAGS) \
+		-v $(TASKRC):/root/.taskrc:ro$(VOLUME_OPTS) \
+		-v $(TASK_DATA):/root/.task:rw$(VOLUME_OPTS) \
 		-e TODOIST_API_KEY="$(TODOIST_API_KEY)" \
 		$(IMAGE_NAME) $(ARGS)
 

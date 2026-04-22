@@ -1,8 +1,5 @@
 Click==8.1.7
 todoist-python==8.1.4
 pyyaml
-
-# Temporarily use this until upstream PR #121 is merged
-# https://github.com/ralphbean/taskw/pull/121 
-git+git://github.com/matt-snider/taskw.git@develop
+taskw>=2.0.0
 

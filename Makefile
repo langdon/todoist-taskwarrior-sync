@@ -49,7 +49,7 @@ run: _check-api-key
 		-e TODOIST_API_KEY="$(TODOIST_API_KEY)" \
 		$(IMAGE_NAME) $(ARGS)
 
-sync-dry: ARGS=sync --dry-run
+sync-dry: ARGS=sync
 sync-dry: run
 
 sync: ARGS=sync --apply

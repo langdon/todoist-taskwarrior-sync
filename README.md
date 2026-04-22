@@ -68,10 +68,10 @@ and tag mappings:
 
 | Command | Effect |
 |---------|--------|
-| `sync --dry-run` | Preview two-way sync, no writes |
+| `sync` | Preview two-way sync, no writes (default) |
 | `sync --apply` | Apply two-way sync |
-| `import-v1 --dry-run` | Preview Todoist → Taskwarrior only |
-| `import-v1 --apply` | Apply Todoist → Taskwarrior only |
+| `import-v1` | Preview Todoist → Taskwarrior only (default) |
+| `import-v1 --apply` | Apply one-way import (never writes to Todoist) |
 
 ## Development
 

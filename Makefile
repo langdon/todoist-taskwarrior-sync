@@ -2,6 +2,7 @@ IMAGE_NAME      ?= titwsync
 CONTAINER_FNAME ?= Containerfile
 TASKRC          ?= $(HOME)/.taskrc
 TASK_DATA       ?= $(HOME)/.task
+TITWSYNC_CFG    ?= $(HOME)/.config/titwsync/titwsyncrc.yaml
 ARGS            ?= --help
 PODMAN_FLAGS    ?= -it
 
@@ -34,6 +35,7 @@ help:
 	@echo "Optional vars:"
 	@echo "  TASKRC=$(TASKRC)"
 	@echo "  TASK_DATA=$(TASK_DATA)"
+	@echo "  TITWSYNC_CFG=$(TITWSYNC_CFG)"
 	@echo "  ARGS='sync --apply'"
 
 build:
@@ -46,6 +48,7 @@ run: _check-api-key
 	@$(ENGINE) run --rm $(PODMAN_FLAGS) \
 		-v $(TASKRC):/root/.taskrc:ro$(VOLUME_OPTS) \
 		-v $(TASK_DATA):/root/.task:rw$(VOLUME_OPTS) \
+		-v $(TITWSYNC_CFG):/root/.config/titwsync/titwsyncrc.yaml:ro$(VOLUME_OPTS) \
 		-e TODOIST_API_KEY="$(TODOIST_API_KEY)" \
 		-e TASKDATA=/root/.task \
 		-e HOME=/root \

@@ -1,71 +1,90 @@
-# todoist-taskwarrior
+# todoist-taskwarrior-sync
 
-A tool for syncing Todoist tasks with Taskwarrior.
+Two-way sync between Todoist and Taskwarrior.
 
-Forked from https://git.webmeisterei.com/webmeisterei/todoist-taskwarrior/, which was forked from https://github.com/matt-snider/todoist-taskwarrior
+Fork of [adam-gaia/todoist-taskwarrior-sync](https://github.com/adam-gaia/todoist-taskwarrior-sync),
+itself forked from [webmeisterei](https://git.webmeisterei.com/webmeisterei/todoist-taskwarrior/),
+originally from [matt-snider/todoist-taskwarrior](https://github.com/matt-snider/todoist-taskwarrior).
 
-## Installation
+## Running (container — recommended)
 
-```bash
-git clone https://git.webmeisterei.com/webmeisterei/todoist-taskwarrior.git
-cd todoist-taskwarrior/
-```
-
-- To install in Virtualenv:
+Avoids Python version breakage across OS upgrades.
 
 ```bash
-virtualenv -p /usr/bin/python3 venv
-venv/bin/pip install -r requirements.txt
-venv/bin/python setup.py install
+make podman-build
+make sync-dry    # preview, no writes
+make sync        # apply changes to both sides
 ```
 
-- To install global:
+`TODOIST_API_KEY` must be set in your environment. The container mounts
+`~/.taskrc` (read-only) and `~/.task` (read-write).
+
+For custom invocations:
 
 ```bash
-sudo pip3 install -r requirements.txt
-sudo python3 setup.py install
+make podman-run ARGS="import-v1 --dry-run"
 ```
 
-## Configure
+## Running (local venv)
 
-First optain a Todoist API key from the [Todoist Integrations Settings](https://todoist.com/prefs/integrations).
+Faster to iterate on, but venv breaks when the system Python minor version bumps.
 
-Now you can configure `titwsync` with (replace `./venv/bin/titwsync` with `titwsync` if you use todoist_taskwarrior without a virtualenv):
-
-```sh
-./venv/bin/titwsync configure --map-project Inbox= --map-project Company=work --map-project Company.SubProject=work.subproject --map-tag books=reading <TODOIST_API_KEY>
+```bash
+cd todoist-taskwarrior-sync
+python3 -m venv .venv
+.venv/bin/pip install -r requirements.txt
+.venv/bin/pip install --no-deps .
+export TODOIST_API_KEY='<your-token>'
+./titwsync sync --dry-run
+./titwsync sync --apply
 ```
 
-`titwsync configure` writes the configuration to `~/.titwsyncrc.yaml`, with the key: `taskwarrior.project_sync.PROJECT_NAME` you can enable or disable the sync of a whole project!
+Recreate the venv any time it breaks (e.g. after a Python minor version upgrade).
 
-## Usage
+## Todoist API situation
 
-Running the tool requires that your Todoist API key is available from the
-environment under the name `TODOIST_API_KEY`. The key can be found or created in
-the ).
+This tool uses `todoist-python==8.1.4`, which targets the **Todoist Sync API v1**.
+Todoist shipped a v2 API, had significant problems with it, and effectively had
+to walk it back — the situation remains messy. The v1 library works but is
+unmaintained and will not receive updates.
 
-The main task is `sync` which will sync all tasks. Since Todoist's internal
-ID is saved with the task, subsequent runs will detect and skip duplicates:
+If sync starts returning errors, check whether Todoist has changed their API
+surface again. The VA uses the REST API v1 (`/api/v1/`) directly rather than
+this library, which has proven more stable.
 
-Replace `./venv/bin/titwsync` with `titwsync` if you use todoist_taskwarrior without a virtualenv.
+## Configuration
 
-```sh
-./venv/bin/titwsync sync
+`titwsync configure` writes `~/.titwsyncrc.yaml`. Run once to set up project
+and tag mappings:
+
+```bash
+./titwsync configure \
+  --map-project Inbox= \
+  --map-project MyProject=myproject \
+  $TODOIST_API_KEY
 ```
+
+## Commands
+
+| Command | Effect |
+|---------|--------|
+| `sync --dry-run` | Preview two-way sync, no writes |
+| `sync --apply` | Apply two-way sync |
+| `import-v1 --dry-run` | Preview Todoist → Taskwarrior only |
+| `import-v1 --apply` | Apply Todoist → Taskwarrior only |
 
 ## Development
 
-### Testing
-
-```sh
-python -m pytest tests
+```bash
+python -m pytest tests/
 ```
 
 ## License
 
-Licensed under the MIT license.
+MIT
 
 ## Authors
 
 - 2018-2019 [matt-snider](https://github.com/matt-snider/todoist-taskwarrior)
-- 2019- [webmeisterei](https://git.webmeisterei.com/webmeisterei/todoist-taskwarrior)
+- 2019– [webmeisterei](https://git.webmeisterei.com/webmeisterei/todoist-taskwarrior)
+- 2022– [adam-gaia](https://github.com/adam-gaia/todoist-taskwarrior-sync)

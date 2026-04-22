@@ -11,7 +11,7 @@ PODMAN_FLAGS    ?= -it
 _PODMAN := $(shell command -v podman 2>/dev/null)
 ifneq ($(_PODMAN),)
   ENGINE      := podman
-  VOLUME_OPTS := :Z
+  VOLUME_OPTS := ,Z
 else
   ENGINE      := docker
   VOLUME_OPTS :=

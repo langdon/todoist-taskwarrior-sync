@@ -3,7 +3,7 @@ FROM registry.fedoraproject.org/fedora-minimal:latest
 RUN microdnf install -y \
     python3 \
     python3-pip \
-    taskwarrior \
+    task \
     && microdnf clean all
 
 WORKDIR /app

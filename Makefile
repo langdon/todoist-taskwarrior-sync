@@ -18,16 +18,32 @@ else
   VOLUME_OPTS :=
 endif
 
-.PHONY: help build build-force run sync-dry sync _check-api-key
+# Allow `make run <cmd> [args...]` — extra words after "run" become the command.
+# e.g. `make run count` runs `titwsync count`
+#      `make run sync --apply` runs `titwsync sync --apply`
+ifeq ($(firstword $(MAKECMDGOALS)),run)
+  RUN_ARGS := $(wordlist 2,$(words $(MAKECMDGOALS)),$(MAKECMDGOALS))
+  ifneq ($(RUN_ARGS),)
+    $(eval $(RUN_ARGS):;@:)
+  endif
+endif
+
+.PHONY: help build build-force run run-configure sync-dry sync _check-api-key _run-engine
 
 help:
 	@echo "Container engine: $(ENGINE)"
 	@echo ""
-	@echo "make build        - Build the container image"
-	@echo "make build-force  - Rebuild without cache"
-	@echo "make run          - Run with custom ARGS (default: --help)"
-	@echo "make sync-dry     - Two-way sync dry run"
-	@echo "make sync         - Two-way sync (writes to both sides)"
+	@echo "make build              - Build the container image"
+	@echo "make build-force        - Rebuild without cache"
+	@echo "make run [cmd [args]]   - Run titwsync command (default: --help)"
+	@echo "make run-configure      - Interactive configure (set project/tag mappings)"
+	@echo "make sync-dry           - Two-way sync dry run"
+	@echo "make sync               - Two-way sync (writes to both sides)"
+	@echo ""
+	@echo "Examples:"
+	@echo "  make run count"
+	@echo "  make run sync"
+	@echo "  make run sync --apply"
 	@echo ""
 	@echo "Required env:"
 	@echo "  TODOIST_API_KEY - Set in environment before running"
@@ -36,7 +52,6 @@ help:
 	@echo "  TASKRC=$(TASKRC)"
 	@echo "  TASK_DATA=$(TASK_DATA)"
 	@echo "  TITWSYNC_CFG=$(TITWSYNC_CFG)"
-	@echo "  ARGS='sync --apply'"
 
 build:
 	@$(ENGINE) build -t $(IMAGE_NAME) --file=$(CONTAINER_FNAME) .
@@ -44,7 +59,7 @@ build:
 build-force:
 	@$(ENGINE) build -t $(IMAGE_NAME) --file=$(CONTAINER_FNAME) --no-cache .
 
-run: _check-api-key
+_run-engine:
 	@$(ENGINE) run --rm $(PODMAN_FLAGS) \
 		-v $(TASKRC):/root/.taskrc:ro$(VOLUME_OPTS) \
 		-v $(TASK_DATA):/root/.task:rw$(VOLUME_OPTS) \
@@ -52,13 +67,19 @@ run: _check-api-key
 		-e TODOIST_API_KEY="$(TODOIST_API_KEY)" \
 		-e TASKDATA=/root/.task \
 		-e HOME=/root \
-		$(IMAGE_NAME) $(ARGS)
+		$(IMAGE_NAME) $(CMD)
 
-sync-dry: ARGS=sync
-sync-dry: run
+run: _check-api-key
+	@$(MAKE) --no-print-directory _run-engine CMD="$(if $(RUN_ARGS),$(RUN_ARGS),$(ARGS))"
 
-sync: ARGS=sync --apply
-sync: run
+run-configure: _check-api-key
+	@$(MAKE) --no-print-directory _run-engine CMD="configure $(TODOIST_API_KEY)"
+
+sync-dry: _check-api-key
+	@$(MAKE) --no-print-directory _run-engine CMD="sync"
+
+sync: _check-api-key
+	@$(MAKE) --no-print-directory _run-engine CMD="sync --apply"
 
 _check-api-key:
 	@if [ -z "$(TODOIST_API_KEY)" ]; then \

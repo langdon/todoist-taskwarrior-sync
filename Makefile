@@ -28,21 +28,22 @@ ifeq ($(firstword $(MAKECMDGOALS)),run)
   endif
 endif
 
-.PHONY: help build build-force run run-configure sync-dry sync _check-api-key _run-engine
+.PHONY: help build build-force run run-configure shell sync-dry sync _check-api-key _run-engine
 
 help:
 	@echo "Container engine: $(ENGINE)"
 	@echo ""
 	@echo "make build              - Build the container image"
 	@echo "make build-force        - Rebuild without cache"
-	@echo "make run [cmd [args]]   - Run titwsync command (default: --help)"
-	@echo "make run-configure      - Interactive configure (set project/tag mappings)"
+	@echo "make run [cmd [args]]   - Run a titwsync command (default: --help)"
+	@echo "make run-configure      - Run titwsync configure (set project/tag mappings)"
 	@echo "make sync-dry           - Two-way sync dry run"
 	@echo "make sync               - Two-way sync (writes to both sides)"
+	@echo "make shell              - Open a shell in the container (for debugging)"
 	@echo ""
 	@echo "Examples:"
-	@echo "  make run count"
 	@echo "  make run sync"
+	@echo "  make run import-v1"
 	@echo "  make run sync --apply"
 	@echo ""
 	@echo "Required env:"
@@ -74,6 +75,17 @@ run: _check-api-key
 
 run-configure: _check-api-key
 	@$(MAKE) --no-print-directory _run-engine CMD="configure $(TODOIST_API_KEY)"
+
+shell: _check-api-key
+	@$(ENGINE) run --rm -it \
+		--entrypoint /bin/bash \
+		-v $(TASKRC):/root/.taskrc:ro$(VOLUME_OPTS) \
+		-v $(TASK_DATA):/root/.task:rw$(VOLUME_OPTS) \
+		-v $(TITWSYNC_CFG):/root/.config/titwsync/titwsyncrc.yaml:ro$(VOLUME_OPTS) \
+		-e TODOIST_API_KEY="$(TODOIST_API_KEY)" \
+		-e TASKDATA=/root/.task \
+		-e HOME=/root \
+		$(IMAGE_NAME)
 
 sync-dry: _check-api-key
 	@$(MAKE) --no-print-directory _run-engine CMD="sync"

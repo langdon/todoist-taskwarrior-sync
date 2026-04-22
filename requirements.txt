@@ -2,4 +2,5 @@ Click==8.1.7
 todoist-python==8.1.4
 pyyaml
 taskw>=2.0.0
+setuptools  # provides distutils shim for Python 3.12+
 

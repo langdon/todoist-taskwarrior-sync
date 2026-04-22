@@ -1,18 +1,20 @@
-FROM python:3.13-slim
+FROM registry.fedoraproject.org/fedora-minimal:latest
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
+RUN microdnf install -y \
+    python3 \
+    python3-pip \
     taskwarrior \
-    && rm -rf /var/lib/apt/lists/*
+    && microdnf clean all
 
 WORKDIR /app
 
 COPY requirements.txt ./
-RUN pip install --no-cache-dir -r requirements.txt
+RUN pip3 install --no-cache-dir -r requirements.txt
 
 COPY todoist_taskwarrior/ ./todoist_taskwarrior/
 COPY pyproject.toml ./
 
-RUN pip install --no-cache-dir --no-deps .
+RUN pip3 install --no-cache-dir --no-deps .
 
 ENTRYPOINT ["titwsync"]
 CMD ["--help"]

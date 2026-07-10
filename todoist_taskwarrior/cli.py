@@ -18,7 +18,7 @@ TITWSYNCRC = '~/.config/titwsync/titwsyncrc.yaml' # TODO: read XDG_CONFIG_DIR
 
 config = None
 taskwarrior = None
-TASKWARRIOR_INTERNAL_UPDATE_FIELDS = {'imask', 'mask'}
+TASKWARRIOR_INTERNAL_UPDATE_FIELDS = {'imask', 'mask', 'parent', 'rtype'}
 
 """ CLI Commands """
 

@@ -273,6 +273,8 @@ class TestTwUpdateTask:
         tw = _tw_task(description='Old')
         tw['imask'] = 4
         tw['mask'] = '-----'
+        tw['parent'] = 'parent-uuid'
+        tw['rtype'] = 'periodic'
         ti = {
             'tid': 'ti_1',
             'description': 'New',
@@ -291,8 +293,12 @@ class TestTwUpdateTask:
         assert update_arg['description'] == 'New'
         assert 'imask' not in update_arg
         assert 'mask' not in update_arg
+        assert 'parent' not in update_arg
+        assert 'rtype' not in update_arg
         assert tw['imask'] == 4
         assert tw['mask'] == '-----'
+        assert tw['parent'] == 'parent-uuid'
+        assert tw['rtype'] == 'periodic'
 
 
 # ---------------------------------------------------------------------------

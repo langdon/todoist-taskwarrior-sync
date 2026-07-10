@@ -18,6 +18,7 @@ TITWSYNCRC = '~/.config/titwsync/titwsyncrc.yaml' # TODO: read XDG_CONFIG_DIR
 
 config = None
 taskwarrior = None
+TASKWARRIOR_INTERNAL_UPDATE_FIELDS = {'imask', 'mask'}
 
 """ CLI Commands """
 
@@ -297,7 +298,7 @@ def sync(dry_run):
                 newly_created_tids.add(new_tid)
                 tw_task['todoist_id'] = new_tid
                 tw_task['todoist_sync'] = datetime.datetime.now()
-                taskwarrior.task_update(tw_task)
+                _taskwarrior_update_task(tw_task)
                 stats['pushed_new'] += 1
             except Exception as e:
                 log.error(f"Failed to push task to Todoist: {e}")
@@ -324,7 +325,7 @@ def sync(dry_run):
             try:
                 tw_task['status'] = 'completed'
                 tw_task['todoist_sync'] = datetime.datetime.now()
-                taskwarrior.task_update(tw_task)
+                _taskwarrior_update_task(tw_task)
                 stats['completed_in_tw'] += 1
             except Exception as e:
                 log.error(f"Failed to complete TW task: {e}")
@@ -515,7 +516,7 @@ def _sync_task_v1(
         # No changes detected; stamp todoist_sync if it was never set
         if not dry_run and 'todoist_sync' not in tw_task:
             tw_task['todoist_sync'] = datetime.datetime.now()
-            taskwarrior.task_update(tw_task)
+            _taskwarrior_update_task(tw_task)
 
 
 def _push_tw_to_todoist_v1(client, tw_task, tw_name_to_project_id):
@@ -542,7 +543,7 @@ def _push_tw_to_todoist_v1(client, tw_task, tw_name_to_project_id):
     client.update_task(tid, **updates)
 
     tw_task['todoist_sync'] = datetime.datetime.now()
-    taskwarrior.task_update(tw_task)
+    _taskwarrior_update_task(tw_task)
 
 
 def _tw_add_task(ti_task):
@@ -568,6 +569,14 @@ def _tw_add_task(ti_task):
             todoist_id=ti_task['tid'],       # join key — prevents re-import
             todoist_sync=datetime.datetime.now(),
         )
+
+
+def _taskwarrior_update_task(tw_task):
+    """Send a TW task update without Taskwarrior internal recurrence fields."""
+    taskwarrior.task_update({
+        key: value for key, value in tw_task.items()
+        if key not in TASKWARRIOR_INTERNAL_UPDATE_FIELDS
+    })
 
 
 def _tw_update_task(tw_task, ti_task):
@@ -624,7 +633,7 @@ def _tw_update_task(tw_task, ti_task):
             log.success('OK')
 
             tw_task['todoist_sync'] = datetime.datetime.now()
-            taskwarrior.task_update(tw_task)
+            _taskwarrior_update_task(tw_task)
 
 
 """ Entrypoint """

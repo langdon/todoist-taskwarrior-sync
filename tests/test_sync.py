@@ -269,6 +269,31 @@ class TestTwUpdateTask:
         cli_mod._tw_update_task(tw, ti)
         assert tw['status'] == 'waiting'
 
+    def test_excludes_recurrence_internal_fields_from_task_update(self):
+        tw = _tw_task(description='Old')
+        tw['imask'] = 4
+        tw['mask'] = '-----'
+        ti = {
+            'tid': 'ti_1',
+            'description': 'New',
+            'project': 'Inbox',
+            'tags': [],
+            'priority': None,
+            'entry': None,
+            'due': None,
+            'recur': None,
+            'status': 'pending',
+        }
+
+        cli_mod._tw_update_task(tw, ti)
+
+        update_arg = cli_mod.taskwarrior.task_update.call_args[0][0]
+        assert update_arg['description'] == 'New'
+        assert 'imask' not in update_arg
+        assert 'mask' not in update_arg
+        assert tw['imask'] == 4
+        assert tw['mask'] == '-----'
+
 
 # ---------------------------------------------------------------------------
 # _sync_task_v1 — conflict resolution
